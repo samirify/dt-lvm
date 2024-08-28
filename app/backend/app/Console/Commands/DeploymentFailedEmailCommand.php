@@ -34,7 +34,7 @@ class DeploymentFailedEmailCommand extends Command
         private readonly DeploymentService $deploymentService
     ) {
         $this->emailConfig = [
-            'to' => 'soiswis@gmail.com,samir-9-3@hotmail.com'
+            'to' => env('APP_EMAIL_ERROR_TO_ADDRESS', '')
         ];
 
         parent::__construct();
