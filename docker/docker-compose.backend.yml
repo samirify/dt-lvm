@@ -1,0 +1,92 @@
+services:
+  nginx:
+    container_name: lvm-nginx
+    build:
+      context: ../
+      dockerfile: ./docker/nginx/Dockerfile
+    ports:
+      - "8076:80"
+    networks:
+      - lvm_internal
+    volumes:
+      - ../app/backend/public/:/var/www/html
+      - ./docker/nginx/logs:/var/log/nginx
+    depends_on:
+      - php
+    restart: always
+  php:
+    container_name: lvm-php
+    privileged: true
+    build:
+      context: ../
+      dockerfile: ./docker/php/Dockerfile
+      args:
+        - REVERB_PORT=${REVERB_PORT:-8080}
+    networks:
+      - lvm_internal
+    ports:
+      - "${REVERB_PORT:-8080}:${REVERB_PORT:-8080}"
+    volumes:
+      - ../app/backend/:/var/www/html
+      - vendor:/var/www/html/vendor
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  mailhog:
+    container_name: lvm-mailer
+    image: mailhog/mailhog
+    networks:
+      - lvm_internal
+    ports:
+      - 1025
+      - "8028:8025"
+    restart: on-failure
+  db:
+    container_name: lvm-db
+    image: mysql:8.0
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: "${DB_NAME:-deployments}"
+      MYSQL_USER: "${DB_USER:-deploy_user}"
+      MYSQL_PASSWORD: "${DB_PASS:-pass}"
+      TZ: "${APP_TIMEZONE:-Europe/London}"
+      MYSQL_TCP_PORT: "${DB_PORT:-3306}"
+    ports:
+      - "${DB_PORT:-3306}:${DB_PORT:-3306}"
+    expose:
+      - ${DB_PORT:-3306}
+    networks:
+      - mysql-phpmyadmin
+      - lvm_internal
+    restart: always
+  phpmyadmin:
+    depends_on:
+      - db
+    image: phpmyadmin/phpmyadmin
+    container_name: lvm-phpmyadmin
+    environment:
+      PMA_HOST: "${DB_HOST:-db}"
+      PMA_PORT: "${DB_PORT:-3306}"
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "8084:80"
+    networks:
+      - mysql-phpmyadmin
+      - lvm_internal
+    restart: always
+
+volumes:
+  db_data:
+  vendor:
+    driver: local
+networks:
+  mysql-phpmyadmin:
+  lvm_internal:
+    driver: bridge
+    name: lvm_internal
